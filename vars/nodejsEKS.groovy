@@ -12,10 +12,13 @@ pipeline {
         booleanParam(name: 'deploy', defaultValue: false, description: 'Toggle this value')
     }
     environment{
-        def appVersion = '' //variable declaration
-        nexusUrl = 'nexus.narendra.shop:8081'
-        region = "us-east-1"
-        account_id = "905418111046"
+            def appVersion = '' //variable declaration
+            nexusUrl = pipelineGlobals.nexusURL()
+            region = pipelineGlobals.region()
+            account_id = pipelineGlobals.account_id()
+            component = configMap.get("component")
+            project = configMap.get("project")
+            def releaseExists = ""
     }
     stages {
         stage('read the version'){
