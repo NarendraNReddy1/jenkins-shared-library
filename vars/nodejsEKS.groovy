@@ -39,7 +39,8 @@ def call(Map configMap){
                 environment {
                     SCANNER_HOME = tool 'sonar-6.0' //scanner config
                 }
-            }
+            } */
+
             stage('Docker build'){
                 steps{
 
@@ -141,34 +142,34 @@ def call(Map configMap){
                     }
                 }
             } */
-            stage('Docker build') {
+            // stage('Docker build') {
                 
-                steps {
-                    withAWS(region: 'us-east-1', credentials: "aws-creds-${environment}") {
-                        sh """
-                        aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${account_id}.dkr.ecr.us-east-1.amazonaws.com
+            //     steps {
+            //         withAWS(region: 'us-east-1', credentials: "aws-creds-${environment}") {
+            //             sh """
+            //             aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${account_id}.dkr.ecr.us-east-1.amazonaws.com
 
-                        docker build -t ${account_id}.dkr.ecr.us-east-1.amazonaws.com/${project}/${environment}/${component}:${appVersion} .
+            //             docker build -t ${account_id}.dkr.ecr.us-east-1.amazonaws.com/${project}/${environment}/${component}:${appVersion} .
 
-                        docker images
+            //             docker images
 
-                        docker push ${account_id}.dkr.ecr.us-east-1.amazonaws.com/${project}/${environment}/${component}:${appVersion}
-                        """
-                    }
-                }
-            }
-            stage('Deploy'){
-                when{
-                    expression {params.deploy}
-                }
+            //             docker push ${account_id}.dkr.ecr.us-east-1.amazonaws.com/${project}/${environment}/${component}:${appVersion}
+            //             """
+            //         }
+            //     }
+            // }
+            // stage('Deploy'){
+            //     when{
+            //         expression {params.deploy}
+            //     }
 
-                steps{
-                    build job: "../${component}-cd", parameters: [
-                        string(name: 'version', value: "$appVersion"),
-                        string(name: 'ENVIRONMENT', value: "dev"),
-                    ], wait: true
-                }
-            }
+            //     steps{
+            //         build job: "../${component}-cd", parameters: [
+            //             string(name: 'version', value: "$appVersion"),
+            //             string(name: 'ENVIRONMENT', value: "dev"),
+            //         ], wait: true
+            //     }
+            // }
         }
 
         post {
