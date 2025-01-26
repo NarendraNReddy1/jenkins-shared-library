@@ -3,47 +3,41 @@ def call(Map configMap){
         agent {
             label 'AGENT-1'
         }
-        options {
+        options{
             timeout(time: 30, unit: 'MINUTES')
             disableConcurrentBuilds()
-            ansiColor('xterm')
+            //retry(1)
         }
-        environment{
-            def appVersion = '' //variable declaration
-            nexusUrl = pipelineGlobals.nexusURL()
-            region = pipelineGlobals.region()
-            account_id = pipelineGlobals.account_id()
-            component = configMap.get("component")
+        parameters{
+            booleanParam(name: 'deploy', defaultValue: false, description: 'Select to deploy or not')
+        }
+        environment {
+            appVersion = '' // this will become global, we can use across pipeline
+            region = 'us-east-1'
+            account_id = '905418111046'
             project = configMap.get("project")
-            def releaseExists = ""
+            environment = 'dev'
+            component = configMap.get("component")
         }
+
         stages {
-            stage('read the version'){
-                steps{
+            stage('Read the version') {
+                steps {
                     script{
-                        echo sh(returnStdout: true, script: 'env')
                         def packageJson = readJSON file: 'package.json'
                         appVersion = packageJson.version
-                        echo "application version: $appVersion"
-
+                        echo "App version: ${appVersion}"
                     }
                 }
             }
             stage('Install Dependencies') {
                 steps {
-                sh """
-                    npm install
-                    ls -ltr
-                    echo "application version: $appVersion"
-                """
+                    sh 'npm install'
                 }
             }
-            stage('Build'){
-                steps{
-                    sh """
-                    zip -q -r ${component}-${appVersion}.zip * -x Jenkinsfile -x ${component}-${appVersion}.zip
-                    ls -ltr
-                    """
+            /* stage('SonarQube analysis') {
+                environment {
+                    SCANNER_HOME = tool 'sonar-6.0' //scanner config
                 }
             }
             stage('Docker build'){
@@ -131,20 +125,62 @@ def call(Map configMap){
                                 type: 'zip']
                             ]
                         )
+                steps {
+                    // sonar server injection
+                    withSonarQubeEnv('sonar-6.0') {
+                        sh '$SCANNER_HOME/bin/sonar-scanner'
+                        //generic scanner, it automatically understands the language and provide scan results
+                    }
+                }
+            }
+
+            stage('Quality Gate') {
+                steps {
+                    timeout(time: 5, unit: 'MINUTES') {
+                        waitForQualityGate abortPipeline: true
                     }
                 }
             } */
+            stage('Docker build') {
+                
+                steps {
+                    withAWS(region: 'us-east-1', credentials: "aws-creds-${environment}") {
+                        sh """
+                        aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${account_id}.dkr.ecr.us-east-1.amazonaws.com
+
+                        docker build -t ${account_id}.dkr.ecr.us-east-1.amazonaws.com/${project}/${environment}/${component}:${appVersion} .
+
+                        docker images
+
+                        docker push ${account_id}.dkr.ecr.us-east-1.amazonaws.com/${project}/${environment}/${component}:${appVersion}
+                        """
+                    }
+                }
+            }
+            stage('Deploy'){
+                when{
+                    expression {params.deploy}
+                }
+
+                steps{
+                    build job: "../${component}-cd", parameters: [
+                        string(name: 'version', value: "$appVersion"),
+                        string(name: 'ENVIRONMENT', value: "dev"),
+                    ], wait: true
+                }
+            }
         }
-        post { 
-            always { 
-                echo 'I will always say Hello again!'
+
+        post {
+            always{
+                echo "This sections runs always"
                 deleteDir()
             }
-            success { 
-                echo 'I will run when pipeline is success'
+            success{
+                echo "This section run when pipeline success"
             }
-            failure { 
-                echo 'I will run when pipeline is failure'
+            failure{
+                echo "This section run when pipeline failure"
             }
         }
     }
